@@ -23,6 +23,20 @@
             pointer-events: none;
         }
         .help strong { color: #00ffaa; }
+        .navigation {
+            position: fixed;
+            right: 16px;
+            bottom: 16px;
+            z-index: 1;
+            padding: 9px 12px;
+            color: #c8ffef;
+            background: rgba(0, 20, 18, 0.64);
+            border: 1px solid rgba(0, 255, 170, 0.45);
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.5;
+            pointer-events: none;
+        }
     </style>
     <script type="importmap">
     {
@@ -34,6 +48,7 @@
     </script>
 </head>
 <body>
+    <div class="navigation">W/A/S/D or arrow keys: move<br>Q/E: move up/down</div>
     <div class="help"><strong>3D particle cube</strong><br>Drag: rotate 360° · Scroll: zoom · Right-drag: pan</div>
     <script type="module">
         import * as THREE from 'three';
@@ -45,7 +60,7 @@
         // CONFIG
         const COUNT = 20000;
         const SPEED_MULT = 1;
-        const AUTO_SPIN = true;
+        const AUTO_SPIN = false;
 
         // SETUP
         const scene = new THREE.Scene();
@@ -119,6 +134,46 @@
 
         // ANIMATION LOOP
         const clock = new THREE.Clock();
+        const pressedKeys = new Set();
+        const moveDirection = new THREE.Vector3();
+        const rightDirection = new THREE.Vector3();
+        const movement = new THREE.Vector3();
+        const upDirection = new THREE.Vector3(0, 1, 0);
+
+        window.addEventListener('keydown', (event) => {
+            const key = event.key.toLowerCase();
+            if (['w', 'a', 's', 'd', 'q', 'e', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+                event.preventDefault();
+                pressedKeys.add(key);
+            }
+        });
+
+        window.addEventListener('keyup', (event) => {
+            pressedKeys.delete(event.key.toLowerCase());
+        });
+
+        function moveCamera(delta) {
+            if (pressedKeys.size === 0) return;
+
+            camera.getWorldDirection(moveDirection);
+            moveDirection.y = 0;
+            moveDirection.normalize();
+            rightDirection.crossVectors(moveDirection, upDirection).normalize();
+            movement.set(0, 0, 0);
+
+            if (pressedKeys.has('w') || pressedKeys.has('arrowup')) movement.add(moveDirection);
+            if (pressedKeys.has('s') || pressedKeys.has('arrowdown')) movement.sub(moveDirection);
+            if (pressedKeys.has('d') || pressedKeys.has('arrowright')) movement.add(rightDirection);
+            if (pressedKeys.has('a') || pressedKeys.has('arrowleft')) movement.sub(rightDirection);
+            if (pressedKeys.has('e')) movement.add(upDirection);
+            if (pressedKeys.has('q')) movement.sub(upDirection);
+
+            if (movement.lengthSq() > 0) {
+                movement.normalize().multiplyScalar(28 * delta);
+                camera.position.add(movement);
+                controls.target.add(movement);
+            }
+        }
         
         function animate() {
             requestAnimationFrame(animate);
@@ -130,6 +185,7 @@
                 material.uniforms.uTime.value = time;
             }
 
+            moveCamera(delta);
             controls.update();
 
             // SWARM LOGIC
